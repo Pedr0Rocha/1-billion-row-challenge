@@ -52,7 +52,7 @@ func main() {
 	defer file.Close()
 
 	result := processFile(file)
-	fmt.Println(result)
+	fmt.Print(result)
 
 	if *memprofile != "" {
 		f, err := os.Create(*memprofile)
