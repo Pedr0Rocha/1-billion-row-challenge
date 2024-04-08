@@ -9,13 +9,13 @@ test:
 clean:
 	rm -f bin/main
 
-run:
+run: build
 	time ./bin/main
 
 fmt:
 	go fmt ./...
 
-prof:
+prof: build
 	./bin/main -cpuprofile cpu.prof -memprofile mem.prof
 
 .PHONY: all build test clean run fmt

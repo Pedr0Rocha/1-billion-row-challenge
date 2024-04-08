@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"runtime"
@@ -15,6 +17,8 @@ import (
 
 const (
 	MAX_STATIONS = 10_000
+	// on an average of 30 bytes per row, we now read ~1M rows at once
+	CHUNK_SIZE = 64 * 1024 * 1024
 )
 
 type stationData struct {
@@ -51,7 +55,7 @@ func main() {
 	}
 	defer file.Close()
 
-	result := processFile(file)
+	result := processFile(file, CHUNK_SIZE)
 	fmt.Print(result)
 
 	if *memprofile != "" {
@@ -67,43 +71,69 @@ func main() {
 	}
 }
 
-func processFile(file *os.File) string {
-	scanner := bufio.NewScanner(file)
+func processFile(file *os.File, chunkSize int) string {
+	readBuffer := make([]byte, chunkSize)
+	var leftoverBuffer []byte
 
 	stations := make(map[string]*stationData, MAX_STATIONS)
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		parts := strings.Split(line, ";")
-		station := parts[0]
-		measurementString := parts[1]
-		measurementFloat, err := strconv.ParseFloat(measurementString, 64)
-		if err != nil {
-			panic("Could not convert string value to float")
+	for {
+		readBytes, err := file.Read(readBuffer)
+		if err == io.EOF {
+			// read the whole file
+			break
+		}
+		if readBytes == 0 {
+			log.Fatal("could not read file")
 		}
 
-		_, exist := stations[station]
-		if !exist {
-			stationData := stationData{
-				min:   measurementFloat,
-				max:   measurementFloat,
-				count: 1,
-				sum:   measurementFloat,
+		readBuffer = readBuffer[:readBytes]
+
+		// find last new line to set a stopping point
+		lastLineIndex := bytes.LastIndex(readBuffer, []byte("\n"))
+
+		// walk until the last new line +1 to consume it
+		// here we need to merge the last leftover with the current cut buffer
+		resultBuffer := append(leftoverBuffer, readBuffer[:lastLineIndex+1]...)
+
+		// assign all the leftovers to be used in the next iteration
+		// which is everything that we left out when finding the last new line
+		leftoverBuffer = make([]byte, len(readBuffer[lastLineIndex+1:]))
+		copy(leftoverBuffer, readBuffer[lastLineIndex+1:])
+
+		bytesReader := bytes.NewReader(resultBuffer)
+		scanner := bufio.NewScanner(bytesReader)
+
+		for scanner.Scan() {
+			line := scanner.Text()
+
+			parts := strings.Split(line, ";")
+
+			station := parts[0]
+			measurementFloat, _ := strconv.ParseFloat(parts[1], 64)
+
+			_, exist := stations[station]
+			if !exist {
+				stationData := stationData{
+					min:   measurementFloat,
+					max:   measurementFloat,
+					count: 1,
+					sum:   measurementFloat,
+				}
+
+				stations[station] = &stationData
+				continue
 			}
 
-			stations[station] = &stationData
-			continue
-		}
+			if stations[station].min > measurementFloat {
+				stations[station].min = measurementFloat
+			}
+			if stations[station].max < measurementFloat {
+				stations[station].max = measurementFloat
+			}
 
-		if stations[station].min > measurementFloat {
-			stations[station].min = measurementFloat
+			stations[station].count++
+			stations[station].sum += measurementFloat
 		}
-		if stations[station].max < measurementFloat {
-			stations[station].max = measurementFloat
-		}
-
-		stations[station].count++
-		stations[station].sum += measurementFloat
 	}
 
 	results := make([]string, len(stations))
