@@ -2,8 +2,12 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
+	"log"
 	"os"
+	"runtime"
+	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,13 +28,46 @@ func (s stationData) mean() float64 {
 	return s.sum / float64(s.count)
 }
 
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
+var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
+
 func main() {
-	file, err := os.Open("measurements.txt")
+	flag.Parse()
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal("could not create CPU profile: ", err)
+		}
+		defer f.Close() // error handling omitted for example
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal("could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
+
+	file, err := os.Open("50m-measurements.txt")
 	if err != nil {
 		panic("Cannot read file")
 	}
 	defer file.Close()
 
+	result := processFile(file)
+	fmt.Println(result)
+
+	if *memprofile != "" {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			log.Fatal("could not create memory profile: ", err)
+		}
+		defer f.Close()
+		runtime.GC() // get up-to-date statistics
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			log.Fatal("could not write memory profile: ", err)
+		}
+	}
+}
+
+func processFile(file *os.File) string {
 	scanner := bufio.NewScanner(file)
 
 	stations := make(map[string]*stationData, MAX_STATIONS)
@@ -84,7 +121,7 @@ func main() {
 	}
 	// remove last ', '
 	resultStr = resultStr[:len(resultStr)-2]
-	resultStr += "}"
+	resultStr += "}\n"
 
-	fmt.Println(resultStr)
+	return resultStr
 }

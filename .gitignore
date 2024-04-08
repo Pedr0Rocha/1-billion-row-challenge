@@ -1,3 +1,7 @@
 measurements.txt
-small-measurements.txt
-tiny-measurements.txt
+10k-measurements.txt
+1m-measurements.txt
+50m-measurements.txt
+main
+cpu.prof
+mem.prof
