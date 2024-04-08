@@ -7,7 +7,7 @@ import (
 
 const (
 	// small enough to have leftovers
-	TEST_CHUNK_SIZE = 64
+	TEST_CHUNK_SIZE = 32
 )
 
 func TestMain(t *testing.T) {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"flag"
 	"fmt"
@@ -17,8 +16,8 @@ import (
 
 const (
 	MAX_STATIONS = 10_000
-	// on an average of 30 bytes per row, we now read ~1M rows at once
-	CHUNK_SIZE = 64 * 1024 * 1024
+	// on an average of 16 bytes per row, we now read ~1M rows at once
+	CHUNK_SIZE = 16 * 1024 * 1024
 )
 
 type stationData struct {
@@ -49,7 +48,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	file, err := os.Open("50m-measurements.txt")
+	file, err := os.Open("measurements.txt")
 	if err != nil {
 		panic("Cannot read file")
 	}
@@ -88,51 +87,69 @@ func processFile(file *os.File, chunkSize int) string {
 
 		readBuffer = readBuffer[:readBytes]
 
-		// find last new line to set a stopping point
+		// find last new line to set a stopping point where we have complete rows
 		lastLineIndex := bytes.LastIndex(readBuffer, []byte("\n"))
 
 		// walk until the last new line +1 to consume it
-		// here we need to merge the last leftover with the current cut buffer
-		resultBuffer := append(leftoverBuffer, readBuffer[:lastLineIndex+1]...)
+		// here we need to merge the last leftover with the current buffer
+		resultBuffer := make([]byte, len(leftoverBuffer)+readBytes)
+		resultBuffer = append(leftoverBuffer, readBuffer[:lastLineIndex+1]...)
 
-		// assign all the leftovers to be used in the next iteration
+		// prepare the leftovers to be used in the next iteration
 		// which is everything that we left out when finding the last new line
 		leftoverBuffer = make([]byte, len(readBuffer[lastLineIndex+1:]))
 		copy(leftoverBuffer, readBuffer[lastLineIndex+1:])
 
-		bytesReader := bytes.NewReader(resultBuffer)
-		scanner := bufio.NewScanner(bytesReader)
+		var stationName, measurement string
+		var stringBuilder strings.Builder
 
-		for scanner.Scan() {
-			line := scanner.Text()
+		for _, char := range resultBuffer {
+			switch char {
+			case '\n':
+				measurement = stringBuilder.String()
+				stringBuilder.Reset()
+				break
 
-			parts := strings.Split(line, ";")
+			case ';':
+				stationName = stringBuilder.String()
+				stringBuilder.Reset()
+				break
 
-			station := parts[0]
-			measurementFloat, _ := strconv.ParseFloat(parts[1], 64)
+			default:
+				stringBuilder.WriteByte(char)
+			}
 
-			_, exist := stations[station]
-			if !exist {
-				stationData := stationData{
-					min:   measurementFloat,
-					max:   measurementFloat,
-					count: 1,
-					sum:   measurementFloat,
+			// parsed a complete name and measurement, store and reset
+			if len(stationName) != 0 && len(measurement) != 0 {
+				measurementFloat, _ := strconv.ParseFloat(measurement, 64)
+				station := stationName
+
+				stationName = ""
+				measurement = ""
+
+				data, exist := stations[station]
+				if !exist {
+					stationData := stationData{
+						min:   measurementFloat,
+						max:   measurementFloat,
+						sum:   measurementFloat,
+						count: 1,
+					}
+
+					stations[station] = &stationData
+					continue
 				}
 
-				stations[station] = &stationData
-				continue
-			}
+				if data.min > measurementFloat {
+					stations[station].min = measurementFloat
+				}
+				if data.max < measurementFloat {
+					stations[station].max = measurementFloat
+				}
 
-			if stations[station].min > measurementFloat {
-				stations[station].min = measurementFloat
+				stations[station].count++
+				stations[station].sum += measurementFloat
 			}
-			if stations[station].max < measurementFloat {
-				stations[station].max = measurementFloat
-			}
-
-			stations[station].count++
-			stations[station].sum += measurementFloat
 		}
 	}
 
