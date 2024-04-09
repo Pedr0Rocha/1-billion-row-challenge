@@ -11,7 +11,6 @@ import (
 	"runtime/pprof"
 	"sort"
 	"strconv"
-	"strings"
 )
 
 const (
@@ -21,14 +20,14 @@ const (
 )
 
 type stationData struct {
-	min   float64
-	max   float64
-	sum   float64
-	count int64
+	min   int
+	max   int
+	sum   int
+	count int
 }
 
 func (s stationData) mean() float64 {
-	return s.sum / float64(s.count)
+	return float64(s.sum) / float64(s.count)
 }
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
@@ -100,56 +99,35 @@ func processFile(file *os.File, chunkSize int) string {
 		leftoverBuffer = make([]byte, len(readBuffer[lastLineIndex+1:]))
 		copy(leftoverBuffer, readBuffer[lastLineIndex+1:])
 
-		var stationName, measurement string
-		var stringBuilder strings.Builder
+		for len(resultBuffer) != 0 {
+			newBuffer, stationName, measurement := parseBufferSingle(resultBuffer)
+			resultBuffer = newBuffer
 
-		for _, char := range resultBuffer {
-			switch char {
-			case '\n':
-				measurement = stringBuilder.String()
-				stringBuilder.Reset()
-				break
+			measurementInt, _ := strconv.Atoi(string(measurement))
+			station := string(stationName)
 
-			case ';':
-				stationName = stringBuilder.String()
-				stringBuilder.Reset()
-				break
+			data, exist := stations[station]
+			if !exist {
+				stationData := stationData{
+					min:   measurementInt,
+					max:   measurementInt,
+					sum:   measurementInt,
+					count: 1,
+				}
 
-			default:
-				stringBuilder.WriteByte(char)
+				stations[station] = &stationData
+				continue
 			}
 
-			// parsed a complete name and measurement, store and reset
-			if len(stationName) != 0 && len(measurement) != 0 {
-				measurementFloat, _ := strconv.ParseFloat(measurement, 64)
-				station := stationName
-
-				stationName = ""
-				measurement = ""
-
-				data, exist := stations[station]
-				if !exist {
-					stationData := stationData{
-						min:   measurementFloat,
-						max:   measurementFloat,
-						sum:   measurementFloat,
-						count: 1,
-					}
-
-					stations[station] = &stationData
-					continue
-				}
-
-				if data.min > measurementFloat {
-					stations[station].min = measurementFloat
-				}
-				if data.max < measurementFloat {
-					stations[station].max = measurementFloat
-				}
-
-				stations[station].count++
-				stations[station].sum += measurementFloat
+			if data.min > measurementInt {
+				data.min = measurementInt
 			}
+			if data.max < measurementInt {
+				data.max = measurementInt
+			}
+
+			data.count++
+			data.sum += measurementInt
 		}
 	}
 
@@ -164,11 +142,33 @@ func processFile(file *os.File, chunkSize int) string {
 
 	resultStr := "{"
 	for _, v := range results {
-		resultStr += fmt.Sprintf("%s=%.1f/%.1f/%.1f, ", v, stations[v].min, stations[v].mean(), stations[v].max)
+		resultStr += fmt.Sprintf(
+			"%s=%.1f/%.1f/%.1f, ",
+			v,
+			float64(stations[v].min)/10,
+			float64(stations[v].mean())/10,
+			float64(stations[v].max)/10,
+		)
 	}
 	// remove last ', '
 	resultStr = resultStr[:len(resultStr)-2]
 	resultStr += "}\n"
 
 	return resultStr
+}
+
+func parseBufferSingle(resultBuffer []byte) ([]byte, []byte, []byte) {
+	splitIndex := bytes.Index(resultBuffer, []byte{';'})
+	stationName := resultBuffer[:splitIndex]
+
+	resultBuffer = resultBuffer[splitIndex+1:]
+
+	splitIndex = bytes.Index(resultBuffer, []byte{'\n'})
+
+	measurement := resultBuffer[:splitIndex]
+	measurement = bytes.Replace(measurement, []byte{'.'}, []byte{}, 1)
+
+	resultBuffer = resultBuffer[splitIndex+1:]
+
+	return resultBuffer, stationName, measurement
 }
