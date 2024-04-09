@@ -101,7 +101,7 @@ func processFile(file *os.File, chunkSize int) string {
 		copy(leftoverBuffer, readBuffer[lastLineIndex+1:])
 
 		for len(resultBuffer) != 0 {
-			newBuffer, stationName, measurement := parseBufferSingle(resultBuffer)
+			newBuffer, stationName, measurement := parseBufferSingleRow(resultBuffer)
 			resultBuffer = newBuffer
 
 			measurementInt, _ := strconv.Atoi(bytesToString(measurement))
@@ -158,7 +158,10 @@ func processFile(file *os.File, chunkSize int) string {
 	return resultStr
 }
 
-func parseBufferSingle(resultBuffer []byte) ([]byte, []byte, []byte) {
+// parses the buffer to extract station name and measurement from a single row
+// also returns the remainder bytes of the buffer
+// can most likely be modified to return byte interval positions, name[0:20], measurement[21:25]
+func parseBufferSingleRow(resultBuffer []byte) ([]byte, []byte, []byte) {
 	cursor := -1
 	var stationName []byte
 	for i, char := range resultBuffer {
@@ -174,15 +177,15 @@ func parseBufferSingle(resultBuffer []byte) ([]byte, []byte, []byte) {
 
 	resultBuffer = resultBuffer[cursor:]
 
-	var measurement []byte
 	endIndex := -1
+	var measurement []byte
 	for i, char := range resultBuffer {
 		if char != '.' {
 			continue
 		} else {
 			measurement = resultBuffer[:i]
 			measurement = append(measurement, resultBuffer[i+1])
-			// skip '.', '/', 'n'
+			// skip '.X\n'
 			endIndex = i + 3
 			break
 		}
