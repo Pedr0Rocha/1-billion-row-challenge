@@ -163,12 +163,20 @@ func parseBufferSingle(resultBuffer []byte) ([]byte, []byte, []byte) {
 
 	resultBuffer = resultBuffer[splitIndex+1:]
 
-	splitIndex = bytes.Index(resultBuffer, []byte{'\n'})
+	var measurement []byte
+	endIndex := -1
+	for i, char := range resultBuffer {
+		if char != '.' {
+			measurement = append(measurement, char)
+		} else {
+			measurement = append(measurement, resultBuffer[i+1])
+			// jump '.', '/', 'n'
+			endIndex = i + 3
+			break
+		}
+	}
 
-	measurement := resultBuffer[:splitIndex]
-	measurement = bytes.Replace(measurement, []byte{'.'}, []byte{}, 1)
-
-	resultBuffer = resultBuffer[splitIndex+1:]
+	resultBuffer = resultBuffer[endIndex:]
 
 	return resultBuffer, stationName, measurement
 }
