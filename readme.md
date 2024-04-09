@@ -132,7 +132,7 @@ After all those improvements, we have a clear direction on where to improve next
 21.03s  newBuffer, stationName, measurement := parseBufferSingle(resultBuffer)
 ```
 
-- This was a very unpleasant surprise, the map look up is extremly slow.
+- This was a very unpleasant surprise, the map lookup is extremely slow.
 
 ```bash
 38.53s  data, exist := stations[station]
@@ -155,3 +155,37 @@ _Previous best time was 173.05s._
 [Release](https://github.com/Pedr0Rocha/1-billion-row-challenge/releases/tag/v3.0)
 
 [Code](https://github.com/Pedr0Rocha/1-billion-row-challenge/tree/v3.0)
+
+## Attempt #4
+
+From those three problems from attempt #3, I could only tackle the parsing of the result buffer.
+It was very expensive to use `bytes.Index` to find the next `;`. Iterating over the buffer
+and cutting it manually reduced the time spent in this function from 21.03s to ~13.00s.
+
+Another small improvement was to stop appending the chars to build the measurement and only
+use indexes to extract it from the buffer while cutting the `.`. This saved us ~3.00s
+
+There is still some work to do when parsing the row. We are copying and passing a lot of
+bytes around when we could try to return the indexes representing the interval where the
+main buffer should be cut to extract the correct data.
+
+I did some research on how to solve the map lookup issue, with no success. We have some alternatives
+to explore. Implementing our own hash to build the map key, using an int as key and check if it would
+improve something or use a Swissmap. But I will avoid to use external libs for this challenge, so
+unless I can implement a simple version of the Swissmap, I will skip it.
+
+Now our biggest problems are map lookup, and, of course, all the waiting. Since I'm still not
+sure how to move forward with the map key, it's time to spin up some go routines and kill all the
+waiting.
+
+### Results
+
+- 62.31s
+
+_Previous best time was 77.08s._
+
+### Code state
+
+[Release](https://github.com/Pedr0Rocha/1-billion-row-challenge/releases/tag/v4.0)
+
+[Code](https://github.com/Pedr0Rocha/1-billion-row-challenge/tree/v4.0)
