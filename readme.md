@@ -95,5 +95,63 @@ Previous best was 220.42s
 
 ## Attempt #3
 
-The `read` `syscall` is now gone from the flamegraph, giving place to new cpu consuming tasks,
-such as `ParseFloat` from our measurement and `WriteByte` from our parser.
+The `read` `syscall` is now gone from the flamegraph, revealing the new performance killers,
+`ParseFloat` from our measurement and `WriteByte` from our parser.
+
+To improve it, we are going to use integers instead of float and only convert it to float
+as the last operation to print it out. As for the `WriteByte`, we can write our own parser
+for the resulting buffer and try to optimize it.
+
+General improvements were also implemented as they would show up in pprof, such as unnecessary
+assignments of `stationData` and bytes to string convertion.
+
+Turns out that at this level, `string(myBytes)` costs a lot. But after some research, we can
+implement a more efficient way of doing it.
+
+```go
+func bytesToString(b []byte) string {
+	// gets the pointer to the underlying array of the slice
+	pointerToArray := unsafe.SliceData(b)
+	// returns the string of length len(b) of the bytes in the pointer
+	return unsafe.String(pointerToArray, len(b))
+}
+```
+
+After all those improvements, we have a clear direction on where to improve next.
+
+- We stopped converting to float, but we still convert to int, which is taking some time.
+
+```bash
+3.57s  measurementInt, _ := strconv.Atoi(bytesToString(measurement))
+```
+
+- Parsing the `resultBuffer` is too expensive, specially when trying to skip the `'.'` to make
+  our conversion to int easy.
+
+```bash
+21.03s  newBuffer, stationName, measurement := parseBufferSingle(resultBuffer)
+```
+
+- This was a very unpleasant surprise, the map look up is extremly slow.
+
+```bash
+38.53s  data, exist := stations[station]
+```
+
+And of course, we are still waiting for the resultBuffer to be parsed to continue reading from
+the file. This can be improved by parsing pieces of the buffer at the same time using go routines
+and merge the result somewhere.
+But I'll try to improve the linear solution as much as possible before paralelizing the workload as
+it will become more complex.
+
+### Results
+
+- 77.08s
+
+_Previous best time was 173.05s._
+
+### Code state
+
+[Release](https://github.com/Pedr0Rocha/1-billion-row-challenge/releases/tag/v3.0)
+
+[Code](https://github.com/Pedr0Rocha/1-billion-row-challenge/tree/v3.0)
