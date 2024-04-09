@@ -159,20 +159,30 @@ func processFile(file *os.File, chunkSize int) string {
 }
 
 func parseBufferSingle(resultBuffer []byte) ([]byte, []byte, []byte) {
-	splitIndex := bytes.Index(resultBuffer, []byte{';'})
-	stationName := resultBuffer[:splitIndex]
+	cursor := -1
+	var stationName []byte
+	for i, char := range resultBuffer {
+		if char != ';' {
+			continue
+		} else {
+			stationName = resultBuffer[:i]
+			// skip ';'
+			cursor = i + 1
+			break
+		}
+	}
 
-	resultBuffer = resultBuffer[splitIndex+1:]
+	resultBuffer = resultBuffer[cursor:]
 
 	var measurement []byte
 	endIndex := -1
 	for i, char := range resultBuffer {
 		if char != '.' {
-			// this is costing a lot, needs improvement
-			measurement = append(measurement, char)
+			continue
 		} else {
+			measurement = resultBuffer[:i]
 			measurement = append(measurement, resultBuffer[i+1])
-			// jump '.', '/', 'n'
+			// skip '.', '/', 'n'
 			endIndex = i + 3
 			break
 		}
