@@ -1,8 +1,4 @@
-measurements.txt
-10k-measurements.txt
-1m-measurements.txt
-50m-measurements.txt
-main
+*measurements.txt
 cpu.prof
 mem.prof
 /bin

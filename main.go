@@ -11,6 +11,7 @@ import (
 	"runtime/pprof"
 	"sort"
 	"strconv"
+	"unsafe"
 )
 
 const (
@@ -103,8 +104,8 @@ func processFile(file *os.File, chunkSize int) string {
 			newBuffer, stationName, measurement := parseBufferSingle(resultBuffer)
 			resultBuffer = newBuffer
 
-			measurementInt, _ := strconv.Atoi(string(measurement))
-			station := string(stationName)
+			measurementInt, _ := strconv.Atoi(bytesToString(measurement))
+			station := bytesToString(stationName)
 
 			data, exist := stations[station]
 			if !exist {
@@ -167,6 +168,7 @@ func parseBufferSingle(resultBuffer []byte) ([]byte, []byte, []byte) {
 	endIndex := -1
 	for i, char := range resultBuffer {
 		if char != '.' {
+			// this is costing a lot, needs improvement
 			measurement = append(measurement, char)
 		} else {
 			measurement = append(measurement, resultBuffer[i+1])
@@ -179,4 +181,12 @@ func parseBufferSingle(resultBuffer []byte) ([]byte, []byte, []byte) {
 	resultBuffer = resultBuffer[endIndex:]
 
 	return resultBuffer, stationName, measurement
+}
+
+// Replaces `stationName := string(stationNameInBytes)`
+func bytesToString(b []byte) string {
+	// gets the pointer to the underlying array of the slice
+	pointerToArray := unsafe.SliceData(b)
+	// returns the string of length len(b) of the bytes in the pointer
+	return unsafe.String(pointerToArray, len(b))
 }
