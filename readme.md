@@ -1,6 +1,11 @@
 # 1 Billion Row Challenge
 
-## Attempt #1
+The One Billion Row Challenge -- A fun exploration of how quickly 1B rows from a text file can be
+aggregated with ~~Java~~ Go
+
+[Link to the original challenge](https://github.com/gunnarmorling/1brc)
+
+## Attempt #1 - Got it working
 
 First working version. No optimizations, concurrency or anything fancy.
 
@@ -16,7 +21,7 @@ Added tests and profiling to prepare for second attempt.
 
 [Code](https://github.com/Pedr0Rocha/1-billion-row-challenge/tree/v1.0)
 
-## Attempt #2
+## Attempt #2 - First improvements + Fixes
 
 After adding pprof to the program, it is clear that scanning **each line** using
 `bufio` `Scanner` is not ideal. Pprof shows that we are spending ~80% of the time on the `read` `syscall`.
@@ -25,8 +30,7 @@ To solve this, we can try ingesting more rows per read by increasing the buffer 
 drastically reduce the number of `read` calls. Assuming that we have an avg. of 16 bytes per row, setting
 the buffer size to `16 * 1024 * 1024` should be enough to read ~1M rows at once.
 
-However, this improvement introduced a new issue. Incomplete rows for each chunk read, refered as "leftover"
-from now on.
+However, this improvement introduced a new issue. Incomplete rows for each chunk read or "leftover".
 
 Since we are not reading each line anymore, we don't know where our buffer will end up
 at when reading the main file. So the following situation happens very often:
@@ -83,9 +87,9 @@ it gets stuck trying to backtrack to the last new line._
 
 ### Results
 
-Previous best was 220.42s
-
 - 173.05s
+
+_Previous best was 220.42s_
 
 ### Code state
 
@@ -93,10 +97,10 @@ Previous best was 220.42s
 
 [Code](https://github.com/Pedr0Rocha/1-billion-row-challenge/tree/v2.0)
 
-## Attempt #3
+## Attempt #3 - Parser to extract data from the bytes
 
-The `read` `syscall` is now gone from the flamegraph, revealing the new performance killers,
-`ParseFloat` from our measurement and `WriteByte` from our parser.
+The `read` `syscall` is now gone from the flamegraph, revealing the new performance killers.
+`ParseFloat` from our measurement parsing and `WriteByte` from our string builder that extracts the data.
 
 To improve it, we are going to use integers instead of float and only convert it to float
 as the last operation to print it out. As for the `WriteByte`, we can write our own parser
@@ -105,7 +109,7 @@ for the resulting buffer and try to optimize it.
 General improvements were also implemented as they would show up in pprof, such as unnecessary
 assignments of `stationData` and bytes to string convertion.
 
-Turns out that at this level, `string(myBytes)` costs a lot. But after some research, we can
+At this level, `string(myBytes)` costs a lot and makes a big difference. After some research, we can
 implement a more efficient way of doing it.
 
 ```go
@@ -156,7 +160,7 @@ _Previous best time was 173.05s._
 
 [Code](https://github.com/Pedr0Rocha/1-billion-row-challenge/tree/v3.0)
 
-## Attempt #4
+## Attempt #4 - From helper functions to a more manual approach
 
 From those three problems from attempt #3, I could only tackle the parsing of the result buffer.
 It was very expensive to use `bytes.Index` to find the next `;`. Iterating over the buffer
@@ -189,3 +193,50 @@ _Previous best time was 77.08s._
 [Release](https://github.com/Pedr0Rocha/1-billion-row-challenge/releases/tag/v4.0)
 
 [Code](https://github.com/Pedr0Rocha/1-billion-row-challenge/tree/v4.0)
+
+## Attempt #5 - Workers for the rescue
+
+Finally, it's concurrency time!
+
+The concurrency pipeline has several elements that are connected to each other:
+
+`chunk buffer channel` -> receives all the data read from the main file in chunks
+
+`results channel` -> receives the maps produced by our workers
+
+`file reader + chunk generator go routine` -> responsible for reading from the file by chunks,
+handling the leftovers and pushing the result buffer to the `chunk buffer channel` to be processed.
+It also manages the closing of the `chunk channel` and `results channel`.
+
+`parse chunk workers` -> the workers read from the `chunk buffer channel` and process each chunk
+to extract all the stations contained inside of the chunk. It reads until the `chunk buffer channel`
+gets closed, which is right after the `file reader` finds EOF and pushes the last chunk.
+
+To produce the final result, we also need a reader for the `results channel` that will aggregate
+all the data produced by the workers. Since we will be writing the aggregate data in alphabetical order and
+in the same slice, some serious locking would have to be put in place to avoid race conditions, making this piece
+not very concurrency friendly.
+
+I failed to draw a markdown table to explain this properly, so here's a diagram:
+
+![Diagram](diagram.png)
+
+### Results
+
+- 10.81s
+
+_Previous best time was 62.31s._
+
+### Code state
+
+[Release](https://github.com/Pedr0Rocha/1-billion-row-challenge/releases/tag/v5.0)
+
+[Code](https://github.com/Pedr0Rocha/1-billion-row-challenge/tree/v5.0)
+
+## Attempt #6 - WIP
+
+Great! We managed to get to ~10 seconds.
+
+But of course, we still have some work to do.
+
+![Flame](flamegraph-attempt-6.png)
