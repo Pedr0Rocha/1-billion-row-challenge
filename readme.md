@@ -5,15 +5,26 @@ aggregated with ~~Java~~ Go
 
 [Link to the original challenge](https://github.com/gunnarmorling/1brc)
 
+## Attempts
+
+| Attempt                                                            | Time    |
+| ------------------------------------------------------------------ | ------- |
+| [#1](#attempt-1---got-it-working)                                  | 220.42s |
+| [#2](#attempt-2---first-improvements--fixes)                       | 173.05s |
+| [#3](#attempt-3---parser-to-extract-data-from-the-bytes)           | 77.08s  |
+| [#4](#attempt-4---from-helper-functions-to-a-more-manual-approach) | 62.31s  |
+| [#5](#attempt-5---workers-for-the-rescue)                          | 10.81s  |
+| [#6](#attempt-6---wip)                                             | WIP     |
+
 ## Attempt #1 - Got it working
 
 First working version. No optimizations, concurrency or anything fancy.
 
-Added tests and profiling to prepare for second attempt.
+Added tests and profiling to prepare for the first improvements, lots of work ahead.
 
 ### Results
 
-- 220.42s
+#### 220.42s
 
 ### Code state
 
@@ -23,12 +34,13 @@ Added tests and profiling to prepare for second attempt.
 
 ## Attempt #2 - First improvements + Fixes
 
-After adding pprof to the program, it is clear that scanning **each line** using
-`bufio` `Scanner` is not ideal. Pprof shows that we are spending ~80% of the time on the `read` `syscall`.
+After adding pprof to the program, it is clear that scanning **each line** using the `bufio` `scanner.Text()`
+is far from ideal. Pprof shows that we are spending ~80% of the time on the `read` `syscall`.
 
 To solve this, we can try ingesting more rows per read by increasing the buffer size and
 drastically reduce the number of `read` calls. Assuming that we have an avg. of 16 bytes per row, setting
-the buffer size to `16 * 1024 * 1024` should be enough to read ~1M rows at once.
+the buffer size to `16 * 1024 * 1024` should be enough to read ~1M rows at once. This is now a param that needs
+some tweaking later on.
 
 However, this improvement introduced a new issue. Incomplete rows for each chunk read or "leftover".
 
@@ -58,8 +70,8 @@ Imper
 ```
 
 To solve this issue, we can either keep reading the file until we find a new line or EOF, or
-backtrack the current buffer to the last new line. This attempt implements the later. Continuing the example
-above:
+backtrack the current buffer to the last new line. This attempt implements the second strategy.
+Continuing the example above:
 
 The last `\n` found is here: `Popunhas;-99.7`
 
@@ -87,7 +99,7 @@ it gets stuck trying to backtrack to the last new line._
 
 ### Results
 
-- 173.05s
+#### 173.05s
 
 _Previous best was 220.42s_
 
@@ -150,7 +162,7 @@ it will become more complex.
 
 ### Results
 
-- 77.08s
+#### 77.08s
 
 _Previous best time was 173.05s._
 
@@ -179,12 +191,12 @@ improve something or use a Swissmap. But I will avoid to use external libs for t
 unless I can implement a simple version of the Swissmap, I will skip it.
 
 Now our biggest problems are map lookup, and, of course, all the waiting. Since I'm still not
-sure how to move forward with the map key, it's time to spin up some go routines and kill all the
-waiting.
+sure how to move forward with the map key, it's time to spin up some go routines and kill the time
+wasted on waiting.
 
 ### Results
 
-- 62.31s
+#### 62.31s
 
 _Previous best time was 77.08s._
 
@@ -220,10 +232,11 @@ not very concurrency friendly.
 I failed to draw a markdown table to explain this properly, so here's a diagram:
 
 ![Diagram](diagram.png)
+_concurrency diagram_
 
 ### Results
 
-- 10.81s
+#### 10.81s
 
 _Previous best time was 62.31s._
 
@@ -237,6 +250,7 @@ _Previous best time was 62.31s._
 
 Great! We managed to get to ~10 seconds.
 
-But of course, we still have some work to do.
+But of course, we still have some work to do. This is our "Most Wanted" poster now:
 
 ![Flame](flamegraph-attempt-6.png)
+_most wanted poster_
