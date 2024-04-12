@@ -188,11 +188,11 @@ func processFile(file *os.File, chunkSize int) string {
 func parseChunk(resultBuffer []byte, resultsChan chan<- StationMap) {
 	stations := make(StationMap, MAX_STATIONS)
 	for len(resultBuffer) != 0 {
-		newBuffer, stationName, measurement := parseRow(resultBuffer)
-		resultBuffer = newBuffer
+		readBytes, stationName, measurement := parseRow(resultBuffer)
+		resultBuffer = resultBuffer[readBytes:]
 
-		measurementInt, _ := strconv.Atoi(bytesToString(measurement))
 		station := bytesToString(stationName)
+		measurementInt, _ := strconv.Atoi(bytesToString(measurement))
 
 		data, exist := stations[station]
 		if !exist {
@@ -222,14 +222,11 @@ func parseChunk(resultBuffer []byte, resultsChan chan<- StationMap) {
 
 // parses the buffer to extract station name and measurement from a single row
 // also returns the remainder bytes of the buffer
-// can most likely be modified to return byte interval positions, name[0:20], measurement[21:25]
-func parseRow(resultBuffer []byte) ([]byte, []byte, []byte) {
-	cursor := -1
+func parseRow(resultBuffer []byte) (int, []byte, []byte) {
+	cursor := 0
 	var stationName []byte
-	for i, char := range resultBuffer {
-		if char != ';' {
-			continue
-		} else {
+	for i := 0; i < len(resultBuffer); i++ {
+		if resultBuffer[i] == ';' {
 			stationName = resultBuffer[:i]
 			// skip ';'
 			cursor = i + 1
@@ -237,25 +234,17 @@ func parseRow(resultBuffer []byte) ([]byte, []byte, []byte) {
 		}
 	}
 
-	resultBuffer = resultBuffer[cursor:]
-
-	endIndex := -1
 	var measurement []byte
-	for i, char := range resultBuffer {
-		if char != '.' {
-			continue
-		} else {
-			measurement = resultBuffer[:i]
-			measurement = append(measurement, resultBuffer[i+1])
-			// skip '.X\n'
-			endIndex = i + 3
+	for i := cursor; i < len(resultBuffer); i++ {
+		if resultBuffer[i] == '.' {
+			resultBuffer[i] = resultBuffer[i+1]
+			measurement = resultBuffer[cursor : i+1]
+			// skip '.', '\n'
+			cursor = i + 3
 			break
 		}
 	}
-
-	resultBuffer = resultBuffer[endIndex:]
-
-	return resultBuffer, stationName, measurement
+	return cursor, stationName, measurement
 }
 
 // Replaces `stationName := string(stationNameInBytes)`
