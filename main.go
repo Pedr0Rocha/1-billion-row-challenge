@@ -22,6 +22,8 @@ const (
 	CHUNK_SIZE = 16 * 1024 * 1024
 )
 
+type bufferRange [2]int
+
 type StationMap map[string]*stationData
 
 type stationData struct {
@@ -185,6 +187,78 @@ func processFile(file *os.File, chunkSize int) string {
 	return resultStr
 }
 
+func parseChunk2(resultBuffer []byte, resultsChan chan<- StationMap) {
+	stations := make(StationMap, MAX_STATIONS)
+	i := 0
+	lastIndex := 0
+	for {
+		if lastIndex >= len(resultBuffer)-1 {
+			break
+		}
+		stationRange := bufferRange{}
+		measureRange := bufferRange{}
+
+		i = lastIndex
+		stationRange[0] = i
+		for {
+			// found ';' -> name interval ends here and measurement starts next
+			if resultBuffer[i] == ';' {
+				stationRange[1] = i
+				measureRange[0] = i + 1
+				break
+			}
+			i++
+		}
+		for {
+			// found '.' -> swap decimal with dot to return interval: 33'.3' -> 33'3.'
+			// this way we can return the measurement interval without the '.'
+			if resultBuffer[i] == '.' {
+				resultBuffer[i] = resultBuffer[i+1]
+				measureRange[1] = i + 1
+				break
+			}
+			i++
+		}
+
+		// readBytes, stationRange, measureRange := getRowIntervals2(resultBuffer)
+
+		measurementInt, _ := strconv.Atoi(bytesToString(resultBuffer[measureRange[0]:measureRange[1]]))
+		station := bytesToString(resultBuffer[stationRange[0]:stationRange[1]])
+
+		// fmt.Println("adding", station)
+		// fmt.Println("adding", measurementInt)
+
+		// account for separators and new line
+		// readBytes := i + 3
+		lastIndex = i + 3
+		// resultBuffer = resultBuffer[i+3:]
+
+		data, exist := stations[station]
+		if !exist {
+			stationData := stationData{
+				min:   measurementInt,
+				max:   measurementInt,
+				sum:   measurementInt,
+				count: 1,
+			}
+
+			stations[station] = &stationData
+			continue
+		}
+
+		if data.min > measurementInt {
+			data.min = measurementInt
+		}
+		if data.max < measurementInt {
+			data.max = measurementInt
+		}
+
+		data.count++
+		data.sum += measurementInt
+	}
+	resultsChan <- stations
+}
+
 func parseChunk(resultBuffer []byte, resultsChan chan<- StationMap) {
 	stations := make(StationMap, MAX_STATIONS)
 	for len(resultBuffer) != 0 {
@@ -218,6 +292,40 @@ func parseChunk(resultBuffer []byte, resultsChan chan<- StationMap) {
 		data.sum += measurementInt
 	}
 	resultsChan <- stations
+}
+
+func getRowIntervals2(resultBuffer []byte) (int, bufferRange, bufferRange) {
+	stationRange := bufferRange{}
+	measurementRange := bufferRange{}
+
+	i := 0
+	for {
+		// found ';' -> name interval ends here and measurement starts next
+		if resultBuffer[i] == ';' {
+			stationRange[1] = i
+			measurementRange[0] = i + 1
+			break
+		}
+
+		i++
+	}
+
+	for {
+
+		// found '.' -> swap decimal with dot to return interval: 33'.3' -> 33'3.'
+		// this way we can return the measurement interval without the '.'
+		if resultBuffer[i] == '.' {
+			resultBuffer[i] = resultBuffer[i+1]
+			measurementRange[1] = i + 1
+			break
+		}
+
+		i++
+	}
+
+	// account for separators and new line
+	readBytes := i + 3
+	return readBytes, stationRange, measurementRange
 }
 
 // parses the buffer to extract station name and measurement from a single row
