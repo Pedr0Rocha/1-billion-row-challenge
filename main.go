@@ -126,7 +126,7 @@ func processFile(file *os.File, chunkSize int) string {
 		go func() {
 			// will read until the chunk channel closes
 			for chunk := range chunkBufferChannel {
-				parseChunk(chunk, resultsChannel)
+				parseChunk2(chunk, resultsChannel)
 			}
 			wg.Done()
 		}()
