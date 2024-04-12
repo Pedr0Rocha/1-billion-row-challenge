@@ -201,32 +201,48 @@ func parseChunk2(resultBuffer []byte, resultsChan chan<- StationMap) {
 			}
 			cursor++
 		}
+		// skip ';'
+		cursor++
 
-		// @TODO: try to parse it to a number here, might be much faster than doing this + converting
-		for {
-			// found '.' -> swap decimal with dot to return interval: 33'.3' -> 33'3.'
-			// this way we can return the measurement interval without the '.'
-			if resultBuffer[cursor] == '.' {
-				resultBuffer[cursor] = resultBuffer[cursor+1]
-				measureRange[1] = cursor + 1
-				break
-			}
+		// we are here \/
+		// StationName;-99.9\n
+		// StationName;99.9\n
+
+		isNegative := false
+		if resultBuffer[cursor] == '-' {
+			isNegative = true
 			cursor++
 		}
 
-		measurementInt, _ := strconv.Atoi(bytesToString(resultBuffer[measureRange[0]:measureRange[1]]))
-		station := bytesToString(resultBuffer[stationRange[0]:stationRange[1]])
+		// first digit
+		measure := int(resultBuffer[cursor] - '0')
+		cursor++
 
-		// account for separators and new line
-		// readBytes := i + 3
-		cursor += 3
+		// at this point we can have either a number or a '.'
+		if resultBuffer[cursor] != '.' {
+			// https://stackoverflow.com/a/21322694
+			measure = measure*10 + int(resultBuffer[cursor]-'0')
+			cursor++
+		}
+
+		// walk because here we guarantee to have a '.'
+		cursor++
+		measure = measure*10 + int(resultBuffer[cursor]-'0')
+
+		if isNegative {
+			measure = -measure
+		}
+
+		station := bytesToString(resultBuffer[stationRange[0]:stationRange[1]])
+		// skip new line
+		cursor += 2
 
 		data, exist := stations[station]
 		if !exist {
 			stationData := stationData{
-				min:   measurementInt,
-				max:   measurementInt,
-				sum:   measurementInt,
+				min:   measure,
+				max:   measure,
+				sum:   measure,
 				count: 1,
 			}
 
@@ -234,15 +250,15 @@ func parseChunk2(resultBuffer []byte, resultsChan chan<- StationMap) {
 			continue
 		}
 
-		if data.min > measurementInt {
-			data.min = measurementInt
+		if data.min > measure {
+			data.min = measure
 		}
-		if data.max < measurementInt {
-			data.max = measurementInt
+		if data.max < measure {
+			data.max = measure
 		}
 
 		data.count++
-		data.sum += measurementInt
+		data.sum += measure
 	}
 	resultsChan <- stations
 }
