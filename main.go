@@ -22,6 +22,8 @@ const (
 	CHUNK_SIZE = 16 * 1024 * 1024
 )
 
+type bufferRange [2]int
+
 type StationMap map[string]*stationData
 
 type stationData struct {
@@ -78,7 +80,6 @@ func processFile(file *os.File, chunkSize int) string {
 	var wg sync.WaitGroup
 	nWorkers := runtime.NumCPU() - 1
 
-	// @TODO: experiment with buffered channels
 	resultsChannel := make(chan StationMap)
 	chunkBufferChannel := make(chan []byte)
 
@@ -89,7 +90,6 @@ func processFile(file *os.File, chunkSize int) string {
 		for {
 			readBytes, err := file.Read(readBuffer)
 			if err == io.EOF {
-				// read the whole file
 				break
 			}
 			if readBytes == 0 {
@@ -122,9 +122,8 @@ func processFile(file *os.File, chunkSize int) string {
 	for range nWorkers {
 		wg.Add(1)
 		go func() {
-			// will read until the chunk channel closes
 			for chunk := range chunkBufferChannel {
-				parseChunk(chunk, resultsChannel)
+				parseChunk2(chunk, resultsChannel)
 			}
 			wg.Done()
 		}()
@@ -183,6 +182,69 @@ func processFile(file *os.File, chunkSize int) string {
 	resultStr += "}\n"
 
 	return resultStr
+}
+
+func parseChunk2(resultBuffer []byte, resultsChan chan<- StationMap) {
+	stations := make(StationMap, MAX_STATIONS)
+	cursor := 0
+	for cursor < len(resultBuffer)-1 {
+		stationRange := bufferRange{}
+		measureRange := bufferRange{}
+
+		stationRange[0] = cursor
+		for {
+			// found ';' -> name interval ends here and measurement starts next
+			if resultBuffer[cursor] == ';' {
+				stationRange[1] = cursor
+				measureRange[0] = cursor + 1
+				break
+			}
+			cursor++
+		}
+
+		// @TODO: try to parse it to a number here, might be much faster than doing this + converting
+		for {
+			// found '.' -> swap decimal with dot to return interval: 33'.3' -> 33'3.'
+			// this way we can return the measurement interval without the '.'
+			if resultBuffer[cursor] == '.' {
+				resultBuffer[cursor] = resultBuffer[cursor+1]
+				measureRange[1] = cursor + 1
+				break
+			}
+			cursor++
+		}
+
+		measurementInt, _ := strconv.Atoi(bytesToString(resultBuffer[measureRange[0]:measureRange[1]]))
+		station := bytesToString(resultBuffer[stationRange[0]:stationRange[1]])
+
+		// account for separators and new line
+		// readBytes := i + 3
+		cursor += 3
+
+		data, exist := stations[station]
+		if !exist {
+			stationData := stationData{
+				min:   measurementInt,
+				max:   measurementInt,
+				sum:   measurementInt,
+				count: 1,
+			}
+
+			stations[station] = &stationData
+			continue
+		}
+
+		if data.min > measurementInt {
+			data.min = measurementInt
+		}
+		if data.max < measurementInt {
+			data.max = measurementInt
+		}
+
+		data.count++
+		data.sum += measurementInt
+	}
+	resultsChan <- stations
 }
 
 func parseChunk(resultBuffer []byte, resultsChan chan<- StationMap) {
