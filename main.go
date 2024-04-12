@@ -80,7 +80,6 @@ func processFile(file *os.File, chunkSize int) string {
 	var wg sync.WaitGroup
 	nWorkers := runtime.NumCPU() - 1
 
-	// @TODO: experiment with buffered channels
 	resultsChannel := make(chan StationMap)
 	chunkBufferChannel := make(chan []byte)
 
@@ -91,7 +90,6 @@ func processFile(file *os.File, chunkSize int) string {
 		for {
 			readBytes, err := file.Read(readBuffer)
 			if err == io.EOF {
-				// read the whole file
 				break
 			}
 			if readBytes == 0 {
@@ -124,7 +122,6 @@ func processFile(file *os.File, chunkSize int) string {
 	for range nWorkers {
 		wg.Add(1)
 		go func() {
-			// will read until the chunk channel closes
 			for chunk := range chunkBufferChannel {
 				parseChunk2(chunk, resultsChannel)
 			}
@@ -189,49 +186,40 @@ func processFile(file *os.File, chunkSize int) string {
 
 func parseChunk2(resultBuffer []byte, resultsChan chan<- StationMap) {
 	stations := make(StationMap, MAX_STATIONS)
-	i := 0
-	lastIndex := 0
-	for {
-		if lastIndex >= len(resultBuffer)-1 {
-			break
-		}
+	cursor := 0
+	for cursor < len(resultBuffer)-1 {
 		stationRange := bufferRange{}
 		measureRange := bufferRange{}
 
-		i = lastIndex
-		stationRange[0] = i
+		stationRange[0] = cursor
 		for {
 			// found ';' -> name interval ends here and measurement starts next
-			if resultBuffer[i] == ';' {
-				stationRange[1] = i
-				measureRange[0] = i + 1
+			if resultBuffer[cursor] == ';' {
+				stationRange[1] = cursor
+				measureRange[0] = cursor + 1
 				break
 			}
-			i++
+			cursor++
 		}
+
+		// @TODO: try to parse it to a number here, might be much faster than doing this + converting
 		for {
 			// found '.' -> swap decimal with dot to return interval: 33'.3' -> 33'3.'
 			// this way we can return the measurement interval without the '.'
-			if resultBuffer[i] == '.' {
-				resultBuffer[i] = resultBuffer[i+1]
-				measureRange[1] = i + 1
+			if resultBuffer[cursor] == '.' {
+				resultBuffer[cursor] = resultBuffer[cursor+1]
+				measureRange[1] = cursor + 1
 				break
 			}
-			i++
+			cursor++
 		}
-
-		// readBytes, stationRange, measureRange := getRowIntervals2(resultBuffer)
 
 		measurementInt, _ := strconv.Atoi(bytesToString(resultBuffer[measureRange[0]:measureRange[1]]))
 		station := bytesToString(resultBuffer[stationRange[0]:stationRange[1]])
 
-		// fmt.Println("adding", station)
-		// fmt.Println("adding", measurementInt)
-
 		// account for separators and new line
 		// readBytes := i + 3
-		lastIndex = i + 3
-		// resultBuffer = resultBuffer[i+3:]
+		cursor += 3
 
 		data, exist := stations[station]
 		if !exist {
@@ -292,40 +280,6 @@ func parseChunk(resultBuffer []byte, resultsChan chan<- StationMap) {
 		data.sum += measurementInt
 	}
 	resultsChan <- stations
-}
-
-func getRowIntervals2(resultBuffer []byte) (int, bufferRange, bufferRange) {
-	stationRange := bufferRange{}
-	measurementRange := bufferRange{}
-
-	i := 0
-	for {
-		// found ';' -> name interval ends here and measurement starts next
-		if resultBuffer[i] == ';' {
-			stationRange[1] = i
-			measurementRange[0] = i + 1
-			break
-		}
-
-		i++
-	}
-
-	for {
-
-		// found '.' -> swap decimal with dot to return interval: 33'.3' -> 33'3.'
-		// this way we can return the measurement interval without the '.'
-		if resultBuffer[i] == '.' {
-			resultBuffer[i] = resultBuffer[i+1]
-			measurementRange[1] = i + 1
-			break
-		}
-
-		i++
-	}
-
-	// account for separators and new line
-	readBytes := i + 3
-	return readBytes, stationRange, measurementRange
 }
 
 // parses the buffer to extract station name and measurement from a single row
