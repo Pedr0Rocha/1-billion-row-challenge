@@ -14,7 +14,8 @@ aggregated with ~~Java~~ Go
 | [#3](#attempt-3---parser-to-extract-data-from-the-bytes)           | 77.08s  |
 | [#4](#attempt-4---from-helper-functions-to-a-more-manual-approach) | 62.31s  |
 | [#5](#attempt-5---workers-for-the-rescue)                          | 10.81s  |
-| [#6](#attempt-6---wip)                                             | WIP     |
+| [#6](#attempt-6---getting-creative-when-parsing-measurement)       | 09.49s  |
+| [#7](#attempt-7---wip)                                             | -       |
 
 ## Attempt #1 - Got it working
 
@@ -246,7 +247,7 @@ _Previous best time was 62.31s._
 
 [Code](https://github.com/Pedr0Rocha/1-billion-row-challenge/tree/v5.0)
 
-## Attempt #6 - WIP
+## Attempt #6 - Getting creative when parsing measurement
 
 Great! We managed to get to ~10 seconds.
 
@@ -254,3 +255,37 @@ But of course, we still have some work to do. This is our "Most Wanted" poster n
 
 ![Flame](flamegraph-attempt-6.png)
 _most wanted poster_
+
+I tried many ways of parsing the chunks, but could only save around 50ms in the end.
+However, converting the measurement manually, byte per byte, paid off and we now achieved sub 10 seconds for
+the first time! This is how it works:
+
+Parsing: `Name;-98.7\n`, cursor: `[]`
+
+| Input       | Output | Negative | Desc                                                                                                          |
+| ----------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------- |
+| `-98.7\n`   | ``     | false    | Initial input                                                                                                 |
+| `[-]98.7\n` | ``     | true     | Check for negative sign                                                                                       |
+| `-[9]8.7\n` | `9`    | true     | It will always be the first digit. Parse using this [creative solution](https://stackoverflow.com/a/21322694) |
+| `-9[8].7\n` | `98`   | true     | Check for last digit before decimal or dot. Multiply current output by 10 and sum                             |
+| `-98[.]7\n` | `98`   | true     | Skip '.'                                                                                                      |
+| `-98.[7]\n` | `987`  | true     | Parse the decimal digit                                                                                       |
+| `-98.7[\n]` | `987`  | true     | Skip new line                                                                                                 |
+| `-98.7\n`   | `-987` | true     | Apply negative sign                                                                                           |
+
+But if we really want to see some significant progress, we need to tackle the map problem. We need to find
+a way to improve the `runtime.mapaccess2_faststr` call.
+
+### Results
+
+#### 09.49s
+
+_Previous best time was 10.81s._
+
+### Code state
+
+[Release](https://github.com/Pedr0Rocha/1-billion-row-challenge/releases/tag/v6.0)
+
+[Code](https://github.com/Pedr0Rocha/1-billion-row-challenge/tree/v6.0)
+
+## Attempt #7 - WIP
