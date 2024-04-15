@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"sort"
-	"strconv"
 	"sync"
 	"unsafe"
 )
@@ -123,7 +122,7 @@ func processFile(file *os.File, chunkSize int) string {
 		wg.Add(1)
 		go func() {
 			for chunk := range chunkBufferChannel {
-				parseChunk2(chunk, resultsChannel)
+				parseChunk(chunk, resultsChannel)
 			}
 			wg.Done()
 		}()
@@ -184,7 +183,7 @@ func processFile(file *os.File, chunkSize int) string {
 	return resultStr
 }
 
-func parseChunk2(resultBuffer []byte, resultsChan chan<- StationMap) {
+func parseChunk(resultBuffer []byte, resultsChan chan<- StationMap) {
 	stations := make(StationMap, MAX_STATIONS)
 	cursor := 0
 	for cursor < len(resultBuffer)-1 {
@@ -261,68 +260,6 @@ func parseChunk2(resultBuffer []byte, resultsChan chan<- StationMap) {
 		data.sum += measure
 	}
 	resultsChan <- stations
-}
-
-func parseChunk(resultBuffer []byte, resultsChan chan<- StationMap) {
-	stations := make(StationMap, MAX_STATIONS)
-	for len(resultBuffer) != 0 {
-		readBytes, stationName, measurement := parseRow(resultBuffer)
-		resultBuffer = resultBuffer[readBytes:]
-
-		station := bytesToString(stationName)
-		measurementInt, _ := strconv.Atoi(bytesToString(measurement))
-
-		data, exist := stations[station]
-		if !exist {
-			stationData := stationData{
-				min:   measurementInt,
-				max:   measurementInt,
-				sum:   measurementInt,
-				count: 1,
-			}
-
-			stations[station] = &stationData
-			continue
-		}
-
-		if data.min > measurementInt {
-			data.min = measurementInt
-		}
-		if data.max < measurementInt {
-			data.max = measurementInt
-		}
-
-		data.count++
-		data.sum += measurementInt
-	}
-	resultsChan <- stations
-}
-
-// parses the buffer to extract station name and measurement from a single row
-// also returns the remainder bytes of the buffer
-func parseRow(resultBuffer []byte) (int, []byte, []byte) {
-	cursor := 0
-	var stationName []byte
-	for i := 0; i < len(resultBuffer); i++ {
-		if resultBuffer[i] == ';' {
-			stationName = resultBuffer[:i]
-			// skip ';'
-			cursor = i + 1
-			break
-		}
-	}
-
-	var measurement []byte
-	for i := cursor; i < len(resultBuffer); i++ {
-		if resultBuffer[i] == '.' {
-			resultBuffer[i] = resultBuffer[i+1]
-			measurement = resultBuffer[cursor : i+1]
-			// skip '.', '\n'
-			cursor = i + 3
-			break
-		}
-	}
-	return cursor, stationName, measurement
 }
 
 // Replaces `stationName := string(stationNameInBytes)`
