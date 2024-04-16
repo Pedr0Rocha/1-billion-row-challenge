@@ -2,37 +2,36 @@ package main
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
-func TestMain(t *testing.T) {
-	t.Run("should return correct output for small dataset", func(t *testing.T) {
-		input, _ := os.Open("test_data/input.txt")
-		defer input.Close()
-		expected, _ := os.ReadFile("test_data/expected.txt")
-		expectedContents := string(expected)
+func TestAll(t *testing.T) {
+	paths, err := filepath.Glob("test_data/*.txt")
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-		testChunkSize := 32
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			file, err := os.Open(path)
+			if err != nil {
+				t.Error(err)
+				return
+			}
 
-		result := processFile(input, testChunkSize)
+			outputPath := strings.ReplaceAll(path, ".txt", ".out")
+			expected, _ := os.ReadFile(outputPath)
+			expectedContents := string(expected)
 
-		if result != expectedContents {
-			t.Errorf("wrong result. \nexpected:%s, \ngot:%s", expectedContents, result)
-		}
-	})
+			testChunkSize := 1024 * 512
 
-	t.Run("should return correct output for 1M entries dataset", func(t *testing.T) {
-		input, _ := os.Open("test_data/input-1m.txt")
-		defer input.Close()
-		expected, _ := os.ReadFile("test_data/expected-1m.txt")
-		expectedContents := string(expected)
-
-		testChunkSize := 1024 * 512
-
-		result := processFile(input, testChunkSize)
-
-		if result != expectedContents {
-			t.Errorf("wrong result. \nexpected:%s, \ngot:%s", expectedContents, result)
-		}
-	})
+			result := processFile(file, testChunkSize)
+			if result != expectedContents {
+				t.Errorf("wrong result. \nexpected:%s, \ngot:%s", expectedContents, result)
+			}
+		})
+	}
 }
