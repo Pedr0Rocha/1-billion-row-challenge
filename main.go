@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -17,15 +18,14 @@ import (
 const (
 	MAX_STATIONS = 10_000
 	// on an average of 16 bytes per row, we now read ~1M rows at once
-	// @TODO: experiment buffer sizes
 	CHUNK_SIZE = 16 * 1024 * 1024
 )
 
 type bufferRange [2]int
-
-type StationMap map[string]*stationData
+type StationMap map[uint64]*stationData
 
 type stationData struct {
+	name  []byte
 	min   int
 	max   int
 	sum   int
@@ -33,7 +33,7 @@ type stationData struct {
 }
 
 func (s stationData) mean() float64 {
-	return float64(s.sum) / float64(s.count)
+	return math.Ceil(float64(s.sum) / float64(s.count))
 }
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
@@ -135,32 +135,29 @@ func processFile(file *os.File, chunkSize int) string {
 			existingData, exist := stations[st]
 			if !exist {
 				stationData := stationData{
+					name:  data.name,
 					min:   data.min,
 					max:   data.max,
 					sum:   data.sum,
 					count: data.count,
 				}
-
 				stations[st] = &stationData
 				continue
 			}
-
-			if existingData.min > data.min {
-				existingData.min = data.min
-			}
-			if existingData.max < data.max {
-				existingData.max = data.max
-			}
-
+			existingData.min = min(existingData.min, data.min)
+			existingData.max = max(existingData.max, data.max)
 			existingData.count += data.count
 			existingData.sum += data.sum
 		}
 	}
 
 	results := make([]string, len(stations))
+	resultsData := make(map[string]stationData, len(stations))
 	iter := 0
 	for s := range stations {
-		results[iter] = s
+		name := bytesToString(stations[s].name)
+		results[iter] = name
+		resultsData[name] = *stations[s]
 		iter++
 	}
 
@@ -171,9 +168,9 @@ func processFile(file *os.File, chunkSize int) string {
 		resultStr += fmt.Sprintf(
 			"%s=%.1f/%.1f/%.1f, ",
 			v,
-			float64(stations[v].min)/10,
-			float64(stations[v].mean())/10,
-			float64(stations[v].max)/10,
+			float64(resultsData[v].min)/10,
+			float64(resultsData[v].mean())/10,
+			float64(resultsData[v].max)/10,
 		)
 	}
 	// remove last ', '
@@ -187,15 +184,11 @@ func parseChunk(resultBuffer []byte, resultsChan chan<- StationMap) {
 	stations := make(StationMap, MAX_STATIONS)
 	cursor := 0
 	for cursor < len(resultBuffer)-1 {
-		stationRange := bufferRange{}
-		measureRange := bufferRange{}
-
-		stationRange[0] = cursor
+		stationRange := bufferRange{cursor, 0}
 		for {
 			// found ';' -> name interval ends here and measurement starts next
 			if resultBuffer[cursor] == ';' {
 				stationRange[1] = cursor
-				measureRange[0] = cursor + 1
 				break
 			}
 			cursor++
@@ -232,30 +225,28 @@ func parseChunk(resultBuffer []byte, resultsChan chan<- StationMap) {
 			measure = -measure
 		}
 
-		station := bytesToString(resultBuffer[stationRange[0]:stationRange[1]])
+		station := resultBuffer[stationRange[0]:stationRange[1]]
 		// skip new line
 		cursor += 2
 
-		data, exist := stations[station]
+		hashedStation := customHash(station)
+
+		data, exist := stations[hashedStation]
 		if !exist {
 			stationData := stationData{
+				name:  station,
 				min:   measure,
 				max:   measure,
 				sum:   measure,
 				count: 1,
 			}
 
-			stations[station] = &stationData
+			stations[hashedStation] = &stationData
 			continue
 		}
 
-		if data.min > measure {
-			data.min = measure
-		}
-		if data.max < measure {
-			data.max = measure
-		}
-
+		data.min = min(data.min, measure)
+		data.max = max(data.max, measure)
 		data.count++
 		data.sum += measure
 	}
@@ -268,4 +259,48 @@ func bytesToString(b []byte) string {
 	pointerToArray := unsafe.SliceData(b)
 	// returns the string of length len(b) of the bytes in the pointer
 	return unsafe.String(pointerToArray, len(b))
+}
+
+func customHash(name []byte) uint64 {
+	return addBytes64(Init64, name)
+}
+
+const (
+	// FNV-1
+	offset64 = uint64(14695981039346656037)
+	prime64  = uint64(1099511628211)
+	// Init64 is what 64 bits hash values should be initialized with.
+	Init64 = offset64
+)
+
+// fasthash bytes to uint64 implementation
+// https://github.com/segmentio/fasthash/blob/master/fnv1/hash.go#L63
+func addBytes64(h uint64, b []byte) uint64 {
+	for len(b) >= 8 {
+		h = (h * prime64) ^ uint64(b[0])
+		h = (h * prime64) ^ uint64(b[1])
+		h = (h * prime64) ^ uint64(b[2])
+		h = (h * prime64) ^ uint64(b[3])
+		h = (h * prime64) ^ uint64(b[4])
+		h = (h * prime64) ^ uint64(b[5])
+		h = (h * prime64) ^ uint64(b[6])
+		h = (h * prime64) ^ uint64(b[7])
+		b = b[8:]
+	}
+	if len(b) >= 4 {
+		h = (h * prime64) ^ uint64(b[0])
+		h = (h * prime64) ^ uint64(b[1])
+		h = (h * prime64) ^ uint64(b[2])
+		h = (h * prime64) ^ uint64(b[3])
+		b = b[4:]
+	}
+	if len(b) >= 2 {
+		h = (h * prime64) ^ uint64(b[0])
+		h = (h * prime64) ^ uint64(b[1])
+		b = b[2:]
+	}
+	if len(b) > 0 {
+		h = (h * prime64) ^ uint64(b[0])
+	}
+	return h
 }
