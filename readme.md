@@ -32,6 +32,9 @@ it and getting the total time (last value displayed).
 | [#6](#attempt-6---getting-creative-when-parsing-measurement)       | 5.12s  |
 | [#7](#attempt-7---custom-hash-function)                            | 4.82s  |
 
+I'm pretty happy with the results. This challenge is super interesting because you can iterate over your
+own solution trying to find a better way. I had a blast and learned a lot.
+
 ## Attempt #1 - Got it working
 
 First working version. No optimizations, concurrency or anything fancy.
