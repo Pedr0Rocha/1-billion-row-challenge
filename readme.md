@@ -15,7 +15,7 @@ aggregated with ~~Java~~ Go
 | [#4](#attempt-4---from-helper-functions-to-a-more-manual-approach) | 62.31s  |
 | [#5](#attempt-5---workers-for-the-rescue)                          | 10.81s  |
 | [#6](#attempt-6---getting-creative-when-parsing-measurement)       | 09.49s  |
-| [#7](#attempt-7---wip)                                             | -       |
+| [#7](#attempt-7---custom-hash-function)                            | 08.81s  |
 
 ## Attempt #1 - Got it working
 
@@ -288,4 +288,24 @@ _Previous best time was 10.81s._
 
 [Code](https://github.com/Pedr0Rocha/1-billion-row-challenge/tree/v6.0)
 
-## Attempt #7 - WIP
+## Attempt #7 - Custom hash function
+
+It was not easy to find an improvement to the map `runtime.mapaccess2_faststr` call. I wanted to test if the
+key being an int instead of a string we would get any improvements. The problem is convert our `[]byte` station
+name into a unique uint64 while avoiding collisions.
+
+I found [this](https://github.com/segmentio/fasthash/blob/master/fnv1/hash.go#L63) algorithm that can do
+the job. To be honest, I thought we would get a much better improvement out of this. There must be a better
+way still.
+
+### Results
+
+#### 08.81s
+
+_Previous best time was 09.49s._
+
+### Code state
+
+[Release](https://github.com/Pedr0Rocha/1-billion-row-challenge/releases/tag/v7.0)
+
+[Code](https://github.com/Pedr0Rocha/1-billion-row-challenge/tree/v7.0)
