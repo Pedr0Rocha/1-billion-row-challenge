@@ -19,7 +19,8 @@ Mine is 1 minute slower than the machine they were running the tests on.
 
 ## Attempts
 
-Avg time from 5 executions, dropping the highest and lowest value.
+Avg time from 5 executions, dropping the highest and lowest value. I'm using `time ./bin/main` to measure
+it and getting the `cpu` time total.
 
 | Attempt                                                            | Time    |
 | ------------------------------------------------------------------ | ------- |
