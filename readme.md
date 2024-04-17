@@ -20,17 +20,17 @@ Mine is 1 minute slower than the machine they were running the tests on.
 ## Attempts
 
 Avg time from 5 executions, dropping the highest and lowest value. I'm using `time ./bin/main` to measure
-it and getting the `cpu` time total.
+it and getting the total time (last value displayed).
 
-| Attempt                                                            | Time    |
-| ------------------------------------------------------------------ | ------- |
-| [#1](#attempt-1---got-it-working)                                  | 220.42s |
-| [#2](#attempt-2---first-improvements-and-fixes)                    | 173.05s |
-| [#3](#attempt-3---parser-to-extract-data-from-the-bytes)           | 77.08s  |
-| [#4](#attempt-4---from-helper-functions-to-a-more-manual-approach) | 62.31s  |
-| [#5](#attempt-5---workers-for-the-rescue)                          | 10.81s  |
-| [#6](#attempt-6---getting-creative-when-parsing-measurement)       | 09.49s  |
-| [#7](#attempt-7---custom-hash-function)                            | 08.38s  |
+| Attempt                                                            | Time   |
+| ------------------------------------------------------------------ | ------ |
+| [#1](#attempt-1---got-it-working)                                  | 165.3s |
+| [#2](#attempt-2---first-improvements-and-fixes)                    | 128.0s |
+| [#3](#attempt-3---parser-to-extract-data-from-the-bytes)           | 49.0s  |
+| [#4](#attempt-4---from-helper-functions-to-a-more-manual-approach) | 35.52s |
+| [#5](#attempt-5---workers-for-the-rescue)                          | 5.98s  |
+| [#6](#attempt-6---getting-creative-when-parsing-measurement)       | 5.12s  |
+| [#7](#attempt-7---custom-hash-function)                            | 4.82s  |
 
 ## Attempt #1 - Got it working
 
@@ -40,7 +40,16 @@ Added tests and profiling to prepare for the first improvements, lots of work ah
 
 ### Results
 
-#### 220.42s
+#### 165.3s
+
+| Run | Time                                             | Result   |
+| --- | ------------------------------------------------ | -------- |
+| #1  | 160.42s user 5.52s system 101% cpu 2:43.43 total | drop min |
+| #2  | 162.67s user 5.64s system 101% cpu 2:45.80 total | 2:45.80  |
+| #3  | 164.42s user 5.72s system 101% cpu 2:47.66 total | 2:47.66  |
+| #4  | 163.55s user 5.71s system 101% cpu 2:46.45 total | 2:46.45  |
+| #5  | 178.00s user 5.64s system 101% cpu 3:00.98 total | drop max |
+|     |                                                  | 165.3s   |
 
 ### Code state
 
@@ -115,9 +124,18 @@ it gets stuck trying to backtrack to the last new line._
 
 ### Results
 
-#### 173.05s
+#### 128.0s
 
-_Previous best was 220.42s_
+| Run | Time                                            | Result   |
+| --- | ----------------------------------------------- | -------- |
+| #1  | 125.39s user 1.04s system 98% cpu 2:08.82 total | 2:08.82  |
+| #2  | 125.27s user 1.13s system 98% cpu 2:08.49 total | 2:08.49  |
+| #3  | 125.19s user 1.03s system 98% cpu 2:08.23 total | 2:08.23  |
+| #4  | 123.17s user 1.12s system 98% cpu 2:06.38 total | drop min |
+| #5  | 126.22s user 1.13s system 98% cpu 2:09.33 total | drop max |
+|     |                                                 | 128.0s   |
+
+_Previous best was 165.3s_
 
 ### Code state
 
@@ -178,9 +196,18 @@ it will become more complex.
 
 ### Results
 
-#### 77.08s
+#### 49.0s
 
-_Previous best time was 173.05s._
+| Run | Time                                          | Result   |
+| --- | --------------------------------------------- | -------- |
+| #1  | 46.26s user 0.61s system 96% cpu 48.750 total | drop min |
+| #2  | 47.18s user 0.58s system 96% cpu 49.373 total | 49.373   |
+| #3  | 46.65s user 0.70s system 96% cpu 48.911 total | 48.911   |
+| #4  | 47.17s user 0.83s system 96% cpu 49.752 total | drop max |
+| #5  | 46.41s user 0.65s system 96% cpu 48.758 total | 48.758   |
+|     |                                               | 49.0s    |
+
+_Previous best time was 128.0s._
 
 ### Code state
 
@@ -212,9 +239,18 @@ wasted on waiting.
 
 ### Results
 
-#### 62.31s
+#### 35.52s
 
-_Previous best time was 77.08s._
+| Run | Time                                          | Result   |
+| --- | --------------------------------------------- | -------- |
+| #1  | 32.79s user 0.57s system 94% cpu 35.227 total | drop min |
+| #2  | 33.17s user 0.55s system 95% cpu 35.333 total | 35.333   |
+| #3  | 33.21s user 0.61s system 95% cpu 35.360 total | 35.360   |
+| #4  | 33.74s user 0.59s system 95% cpu 35.868 total | 35.868   |
+| #5  | 33.70s user 0.97s system 96% cpu 36.092 total | drop max |
+|     |                                               | 35.52s   |
+
+_Previous best time was 49.0s._
 
 ### Code state
 
@@ -252,9 +288,18 @@ _concurrency diagram_
 
 ### Results
 
-#### 10.81s
+#### 5.98s
 
-_Previous best time was 62.31s._
+| Run | Time                                          | Result   |
+| --- | --------------------------------------------- | -------- |
+| #1  | 42.10s user 2.47s system 724% cpu 6.154 total | 6.154    |
+| #2  | 42.97s user 2.51s system 729% cpu 6.232 total | drop max |
+| #3  | 42.58s user 2.50s system 771% cpu 5.843 total | drop min |
+| #4  | 42.65s user 2.53s system 769% cpu 5.874 total | 5.874    |
+| #5  | 42.64s user 2.50s system 760% cpu 5.934 total | 5.934    |
+|     |                                               | 5.98s    |
+
+_Previous best time was 35.52s._
 
 ### Code state
 
@@ -264,7 +309,7 @@ _Previous best time was 62.31s._
 
 ## Attempt #6 - Getting creative when parsing measurement
 
-Great! We managed to get to ~10 seconds.
+Great! We managed to get to sub 10 seconds.
 
 But of course, we still have some work to do. This is our "Most Wanted" poster now:
 
@@ -272,7 +317,7 @@ But of course, we still have some work to do. This is our "Most Wanted" poster n
 _most wanted poster_
 
 I tried many ways of parsing the chunks, but could only save around 50ms in the end.
-However, converting the measurement manually, byte per byte, paid off and we now achieved sub 10 seconds for
+However, converting the measurement manually, byte per byte, paid off and we now achieved sub 5 seconds for
 the first time! This is how it works:
 
 Parsing: `Name;-98.7\n`, cursor: `[]`
@@ -293,9 +338,18 @@ a way to improve the `runtime.mapaccess2_faststr` call.
 
 ### Results
 
-#### 09.49s
+#### 05.12s
 
-_Previous best time was 10.81s._
+| Run | Time                                          | Result   |
+| --- | --------------------------------------------- | -------- |
+| #1  | 34.21s user 2.42s system 683% cpu 5.362 total | drop max |
+| #2  | 34.40s user 2.29s system 730% cpu 5.020 total | 5.020    |
+| #3  | 34.40s user 2.41s system 693% cpu 5.310 total | 5.310    |
+| #4  | 34.26s user 2.30s system 726% cpu 5.034 total | 5.034    |
+| #5  | 34.24s user 2.43s system 736% cpu 4.980 total | drop min |
+|     |                                               | 5.12s    |
+
+_Previous best time was 5.98s._
 
 ### Code state
 
@@ -315,9 +369,18 @@ way still.
 
 ### Results
 
-#### 08.38s
+#### 04.82s
 
-_Previous best time was 09.49s._
+| Run | Time                                          | Result   |
+| --- | --------------------------------------------- | -------- |
+| #1  | 33.93s user 2.48s system 769% cpu 4.729 total | 4.729    |
+| #2  | 34.45s user 2.41s system 786% cpu 4.686 total | drop min |
+| #3  | 33.81s user 2.51s system 744% cpu 4.881 total | 4.881    |
+| #4  | 33.95s user 2.42s system 749% cpu 4.855 total | 4.855    |
+| #5  | 34.26s user 2.46s system 751% cpu 4.885 total | drop max |
+|     |                                               | 4.82s    |
+
+_Previous best time was 5.12s._
 
 ### Code state
 

@@ -47,7 +47,7 @@ func main() {
 
 func processFile(file *os.File, chunkSize int) string {
 	var wg sync.WaitGroup
-	nWorkers := runtime.NumCPU() + 2
+	nWorkers := runtime.NumCPU()
 
 	resultsChannel := make(chan StationMap)
 	chunkBufferChannel := make(chan []byte)
