@@ -5,12 +5,22 @@ aggregated with ~~Java~~ Go
 
 [Link to the original challenge](https://github.com/gunnarmorling/1brc)
 
+## Baseline measurement
+
+Generate the measurements from the original challenge and run:
+
+`time ./calculate_average_baseline.sh`
+
+> 176.07s user 4.37s system 99% cpu 3:02.18 total
+
 ## Attempts
+
+Avg time from 5 executions, dropping the highest and lowest value.
 
 | Attempt                                                            | Time    |
 | ------------------------------------------------------------------ | ------- |
 | [#1](#attempt-1---got-it-working)                                  | 220.42s |
-| [#2](#attempt-2---first-improvements--fixes)                       | 173.05s |
+| [#2](#attempt-2---first-improvements-and-fixes)                    | 173.05s |
 | [#3](#attempt-3---parser-to-extract-data-from-the-bytes)           | 77.08s  |
 | [#4](#attempt-4---from-helper-functions-to-a-more-manual-approach) | 62.31s  |
 | [#5](#attempt-5---workers-for-the-rescue)                          | 10.81s  |
@@ -33,7 +43,7 @@ Added tests and profiling to prepare for the first improvements, lots of work ah
 
 [Code](https://github.com/Pedr0Rocha/1-billion-row-challenge/tree/v1.0)
 
-## Attempt #2 - First improvements + Fixes
+## Attempt #2 - First improvements and fixes
 
 After adding pprof to the program, it is clear that scanning **each line** using the `bufio` `scanner.Text()`
 is far from ideal. Pprof shows that we are spending ~80% of the time on the `read` `syscall`.
