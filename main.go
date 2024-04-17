@@ -184,17 +184,9 @@ func parseChunk(resultBuffer []byte, resultsChan chan<- StationMap) {
 	stations := make(StationMap, MAX_STATIONS)
 	cursor := 0
 	for cursor < len(resultBuffer)-1 {
-		stationRange := bufferRange{cursor, 0}
-		for {
-			// found ';' -> name interval ends here and measurement starts next
-			if resultBuffer[cursor] == ';' {
-				stationRange[1] = cursor
-				break
-			}
-			cursor++
-		}
+		station := resultBuffer[cursor : cursor+bytes.Index(resultBuffer[cursor:], []byte{59})]
 		// skip ';'
-		cursor++
+		cursor += len(station) + 1
 
 		// we are here \/
 		// StationName;-99.9\n
@@ -207,12 +199,12 @@ func parseChunk(resultBuffer []byte, resultsChan chan<- StationMap) {
 		}
 
 		// first digit
+		// https://stackoverflow.com/a/21322694
 		measure := int(resultBuffer[cursor] - '0')
 		cursor++
 
 		// at this point we can have either a number or a '.'
 		if resultBuffer[cursor] != '.' {
-			// https://stackoverflow.com/a/21322694
 			measure = measure*10 + int(resultBuffer[cursor]-'0')
 			cursor++
 		}
@@ -224,8 +216,6 @@ func parseChunk(resultBuffer []byte, resultsChan chan<- StationMap) {
 		if isNegative {
 			measure = -measure
 		}
-
-		station := resultBuffer[stationRange[0]:stationRange[1]]
 		// skip new line
 		cursor += 2
 
