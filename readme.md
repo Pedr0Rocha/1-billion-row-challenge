@@ -15,7 +15,7 @@ aggregated with ~~Java~~ Go
 | [#4](#attempt-4---from-helper-functions-to-a-more-manual-approach) | 62.31s  |
 | [#5](#attempt-5---workers-for-the-rescue)                          | 10.81s  |
 | [#6](#attempt-6---getting-creative-when-parsing-measurement)       | 09.49s  |
-| [#7](#attempt-7---custom-hash-function)                            | 08.81s  |
+| [#7](#attempt-7---custom-hash-function)                            | 08.38s  |
 
 ## Attempt #1 - Got it working
 
@@ -300,7 +300,7 @@ way still.
 
 ### Results
 
-#### 08.81s
+#### 08.38s
 
 _Previous best time was 09.49s._
 
