@@ -15,7 +15,8 @@ Generate the measurements from the original challenge and make sure you have a 1
 
 > 176.07s user 4.37s system 99% cpu 3:02.18 total
 
-Mine is 1 minute slower than the machine they were running the tests on.
+Mine is 1 minute slower than the machine they were running the tests on. I'm running the tests on a
+Macbook M2 Pro, 16GB RAM.
 
 ## Attempts
 
